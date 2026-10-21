@@ -101,8 +101,21 @@ router.post('/', (req: Request<Record<string, unknown>, Record<string, unknown>,
       }
 
       if (req.body.layout) {
+        if (typeof req.body.layout !== 'string' || req.body.layout.includes('\0')) {
+          next(new Error('File access not allowed'))
+          return
+        }
+        const viewsDirectory = path.resolve(__dirname, '../views')
+        const normalizedLayout = req.body.layout.replace(/\\/g, '/')
+        const resolvedViewPath = path.resolve(viewsDirectory, normalizedLayout)
+        const relative = path.relative(viewsDirectory, resolvedViewPath)
+        const isOutsideViews: boolean = !resolvedViewPath.startsWith(viewsDirectory + path.sep) ||
+          relative.startsWith('..') ||
+          path.isAbsolute(relative) ||
+          relative === ''
+
         const filePath: string = path.resolve(req.body.layout).toLowerCase()
-        const isForbiddenFile: boolean = (filePath.includes('ftp') || filePath.includes('ctf.key') || filePath.includes('encryptionkeys'))
+        const isForbiddenFile: boolean = isOutsideViews || (filePath.includes('ftp') || filePath.includes('ctf.key') || filePath.includes('encryptionkeys'))
         if (!isForbiddenFile) {
           res.render('dataErasureResult', {
             ...req.body,
